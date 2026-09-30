@@ -1,0 +1,14 @@
+# Secrets & API Keys
+.env
+.env.local
+
+# Local User Data & Vectors
+.synapse_vectors.json
+.usage.json
+temp_*.png
+notes/
+
+# Dependencies & Build
+node_modules/
+dist/
+.DS_Store

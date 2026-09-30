@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background: transparent;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            padding-top: 4px;
+        }
+
+        .island {
+            background: rgba(13, 17, 23, 0.94);
+            backdrop-filter: blur(28px);
+            -webkit-backdrop-filter: blur(28px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 14px;
+            height: 40px;
+            width: 260px;
+            border-radius: 20px;
+            overflow: hidden;
+            transform: translateZ(0);
+            /* Hardware accelerated compositing */
+            will-change: width, height, border-radius;
+            transition: border-color 0.2s ease;
+        }
+
+        .island:hover {
+            border-color: rgba(255, 255, 255, 0.22);
+        }
+
+        .island-bar {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            height: 40px;
+            gap: 10px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .indicator-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #38bdf8;
+            flex-shrink: 0;
+            transition: background-color 0.18s ease;
+        }
+
+        .island-label {
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #e2e8f0;
+            flex-grow: 1;
+        }
+
+        .badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #94a3b8;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+
+        /* Collapsible Text Chat Drawer */
+        .chat-panel {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            opacity: 0;
+            pointer-events: none;
+            padding-bottom: 12px;
+            transition: opacity 0.15s ease-out;
+        }
+
+        .chat-response {
+            font-size: 12px;
+            color: #cbd5e1;
+            max-height: 85px;
+            overflow-y: auto;
+            line-height: 1.45;
+            user-select: text;
+            padding-right: 4px;
+            word-break: break-word;
+        }
+
+        .chat-input {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 7px 12px;
+            font-size: 12px;
+            color: #fff;
+            outline: none;
+            width: 100%;
+            transition: border-color 0.2s ease;
+        }
+
+        .chat-input:focus {
+            border-color: #38bdf8;
+        }
+
+        .tier-footer {
+            font-size: 10px;
+            color: #64748b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2px;
+        }
+
+        .tier-footer span.pro-tag {
+            color: #c084fc;
+            font-weight: 600;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+</head>
+
+<body>
+    <div class="island" id="island">
+        <div class="island-bar" id="islandBar">
+            <div class="indicator-dot" id="dot"></div>
+            <span class="island-label" id="label">Synapse Ready</span>
+            <span class="badge" id="quotaBadge">...</span>
+        </div>
+
+        <div class="chat-panel" id="chatPanel">
+            <div class="chat-response" id="chatResponse">Ask about your notes, code, or captured screens...</div>
+            <input type="text" class="chat-input" id="chatInput" placeholder="Ask your Obsidian brain..." />
+            <div class="tier-footer" id="tierFooter">
+                <span id="footerUsage">Loading quota...</span>
+                <span id="footerLink">Synapse Copilot</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        const island = document.getElementById('island');
+        const dot = document.getElementById('dot');
+        const label = document.getElementById('label');
+        const chatPanel = document.getElementById('chatPanel');
+        const chatResponse = document.getElementById('chatResponse');
+        const chatInput = document.getElementById('chatInput');
+        const quotaBadge = document.getElementById('quotaBadge');
+        const footerUsage = document.getElementById('footerUsage');
+
+        let isExpanded = false;
+
+        // Zero-lag native DOM spring animation (No window resizing)
+        function toggleDrawer(expand) {
+            isExpanded = expand !== undefined ? expand : !isExpanded;
+
+            if (isExpanded) {
+                anime.remove(island);
+                anime({
+                    targets: island,
+                    width: 430,
+                    height: 180,
+                    borderRadius: 16,
+                    duration: 240,
+                    easing: 'spring(1, 85, 13, 0)'
+                });
+                chatPanel.style.opacity = '1';
+                chatPanel.style.pointerEvents = 'auto';
+                chatInput.focus();
+            } else {
+                chatPanel.style.opacity = '0';
+                chatPanel.style.pointerEvents = 'none';
+                anime.remove(island);
+                anime({
+                    targets: island,
+                    width: 260,
+                    height: 40,
+                    borderRadius: 20,
+                    duration: 200,
+                    easing: 'easeOutCubic'
+                });
+            }
+        }
+
+        document.getElementById('islandBar').addEventListener('click', () => toggleDrawer());
+
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && chatInput.value.trim()) {
+                const query = chatInput.value.trim();
+                chatResponse.innerHTML = "<em>Searching vault memory...</em>";
+                chatInput.value = '';
+                ipcRenderer.send('vault:ask', query);
+            }
+        });
+
+        ipcRenderer.on('vault:answer', (_, { answer }) => {
+            if (!isExpanded) toggleDrawer(true);
+            label.innerText = 'Answer Found';
+            dot.style.backgroundColor = '#10b981';
+            chatResponse.innerText = answer;
+        });
+
+        ipcRenderer.on('user:quota', (_, { isPro, remainingCaptures, remainingAutoTypes }) => {
+            if (isPro) {
+                quotaBadge.innerText = 'PRO';
+                quotaBadge.style.background = 'rgba(168, 85, 247, 0.2)';
+                quotaBadge.style.color = '#c084fc';
+                quotaBadge.style.border = '1px solid rgba(168, 85, 247, 0.4)';
+                footerUsage.innerHTML = '<span class="pro-tag">PRO Active</span> • Unlimited Brain Actions';
+            } else {
+                quotaBadge.innerText = `${remainingCaptures} Caps | ${remainingAutoTypes} Types`;
+                quotaBadge.style.background = 'rgba(255, 255, 255, 0.08)';
+                quotaBadge.style.color = '#94a3b8';
+                quotaBadge.style.border = 'none';
+                footerUsage.innerText = `Free Tier: ${remainingCaptures}/15 Captures • ${remainingAutoTypes}/10 Autotypes`;
+            }
+        });
+
+        ipcRenderer.on('island:status', (_, { status, message }) => {
+            label.innerText = message;
+            if (status === 'capturing') {
+                anime({
+                    targets: island,
+                    width: 290,
+                    duration: 160,
+                    easing: 'easeOutQuad'
+                });
+                dot.style.backgroundColor = '#f59e0b';
+            } else if (status === 'analyzing') {
+                dot.style.backgroundColor = '#a855f7';
+            } else if (status === 'done') {
+                dot.style.backgroundColor = '#10b981';
+                setTimeout(() => {
+                    if (!isExpanded) {
+                        anime({
+                            targets: island,
+                            width: 260,
+                            duration: 200,
+                            easing: 'easeOutCubic'
+                        });
+                        label.innerText = 'Synapse Ready';
+                        dot.style.backgroundColor = '#38bdf8';
+                    }
+                }, 1400);
+            } else if (status === 'paywall') {
+                dot.style.backgroundColor = '#ef4444';
+                if (!isExpanded) toggleDrawer(true);
+                chatResponse.innerHTML = `<strong>⚠️ Free Trial Exhausted</strong><br>Upgrade to Synapse Pro to unlock unlimited Ghost Typing and Screen Captures.`;
+            }
+        });
+        // Allow clicking through all transparent areas around the pill
+        island.addEventListener('mouseenter', () => {
+            ipcRenderer.send('island:mouse', true);
+        });
+
+        island.addEventListener('mouseleave', () => {
+            // Keep mouse active if chat drawer is expanded, otherwise pass through
+            if (!isExpanded) {
+                ipcRenderer.send('island:mouse', false);
+            }
+        });
+
+        // When closing the drawer, reset pass-through if the mouse is outside
+        const originalToggleDrawer = toggleDrawer;
+        toggleDrawer = function (expand) {
+            originalToggleDrawer(expand);
+            if (!isExpanded) {
+                // If drawer just closed, let clicks pass through
+                ipcRenderer.send('island:mouse', false);
+            } else {
+                ipcRenderer.send('island:mouse', true);
+            }
+        };
+    </script>
+</body>
+
+</html>
