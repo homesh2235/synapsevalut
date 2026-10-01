@@ -1,10 +1,9 @@
 /* ==========================================================================
-   Synapse Vault AI - Main Plugin Entry
+   Synapse Vault AI - Clean Obsidian Plugin (No child_process)
    ========================================================================== */
 
 const { Plugin, PluginSettingTab, Setting, Notice, Modal } = require('obsidian');
 
-// --- Lemon Squeezy Licensing Logic ---
 const LEMON_API_BASE = 'https://api.lemonsqueezy.com/v1/licenses';
 
 async function activateLemonLicense(licenseKey, instanceName = 'Obsidian-Desktop') {
@@ -34,7 +33,7 @@ async function activateLemonLicense(licenseKey, instanceName = 'Obsidian-Desktop
         }
         return { valid: false, message: data.error || 'Invalid or inactive license key.' };
     } catch (err) {
-        return { valid: false, message: `Network error verifying license: ${err.message}` };
+        return { valid: false, message: `Network error: ${err.message}` };
     }
 }
 
@@ -53,26 +52,21 @@ async function validateLemonLicense(licenseKey, instanceId) {
             })
         });
         const data = await res.json();
-        if (data.valid && data.license_key?.status === 'active') {
-            return { valid: true };
-        }
-        return { valid: false, status: data.license_key?.status || 'inactive' };
+        return { valid: data.valid && data.license_key?.status === 'active' };
     } catch (err) {
-        return { valid: false, error: err.message };
+        return { valid: false };
     }
 }
 
-// Default Configuration
 const DEFAULT_SETTINGS = {
     geminiApiKey: '',
     geminiModel: 'gemini-1.5-flash',
     isPro: false,
     licenseKey: '',
     instanceId: '',
-    checkoutUrl: 'https://synapsevalut.lemonsqueezy.com/checkout/buy/6040d1da-9ef3-455e-89cf-520f0a46c73e' // Replace with your actual checkout URL
+    checkoutUrl: 'https://lemonsqueezy.com'
 };
 
-// --- Question / Answer Modal ---
 class SynapseAskModal extends Modal {
     constructor(app, plugin) {
         super(app);
@@ -115,14 +109,13 @@ class SynapseAskModal extends Modal {
                 return;
             }
             if (!this.plugin.settings.geminiApiKey) {
-                new Notice('Please configure your Gemini API Key in Synapse Vault settings.');
+                new Notice('Please configure your Gemini API Key in settings.');
                 return;
             }
 
-            resultBox.setText('Synthesizing answer from your vault...');
+            resultBox.setText('Synthesizing answer from your notes...');
 
             try {
-                // Collect markdown content from markdown files in the vault
                 const files = this.app.vault.getMarkdownFiles();
                 let contextSnippet = '';
                 const limit = this.plugin.settings.isPro ? files.length : Math.min(files.length, 5);
@@ -137,7 +130,7 @@ class SynapseAskModal extends Modal {
                 const payload = {
                     contents: [{
                         parts: [{
-                            text: `You are an AI knowledge assistant for an Obsidian vault. Use the provided note context to directly answer the user query.\n\nContext:\n${contextSnippet}\n\nQuestion: ${query}`
+                            text: `You are an AI knowledge assistant for an Obsidian vault. Answer using this note context:\n\nContext:\n${contextSnippet}\n\nQuestion: ${query}`
                         }]
                     }]
                 };
@@ -158,12 +151,10 @@ class SynapseAskModal extends Modal {
     }
 
     onClose() {
-        const { contentEl } = this;
-        contentEl.empty();
+        this.contentEl.empty();
     }
 }
 
-// --- Settings Tab ---
 class SynapseSettingTab extends PluginSettingTab {
     constructor(app, plugin) {
         super(app, plugin);
@@ -175,8 +166,6 @@ class SynapseSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         containerEl.createEl('h2', { text: 'Synapse Vault AI Settings' });
-
-        // Lemon Squeezy Membership & Pro Activation
         containerEl.createEl('h3', { text: 'Pro Membership & Licensing' });
 
         const statusBadge = this.plugin.settings.isPro
@@ -242,12 +231,11 @@ class SynapseSettingTab extends PluginSettingTab {
                     })
             );
 
-        // AI Core Configuration
         containerEl.createEl('h3', { text: 'AI Model Configuration' });
 
         new Setting(containerEl)
             .setName('Gemini API Key')
-            .setDesc('Google Gemini API Key for note indexing and queries.')
+            .setDesc('Google Gemini API Key for note indexing.')
             .addText((text) =>
                 text
                     .setPlaceholder('Enter your Gemini API Key')
@@ -260,7 +248,7 @@ class SynapseSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Gemini Model')
-            .setDesc('Select the generation model.')
+            .setDesc('Select generation model.')
             .addDropdown((dropdown) =>
                 dropdown
                     .addOption('gemini-1.5-flash', 'Gemini 1.5 Flash (Fast)')
@@ -274,12 +262,10 @@ class SynapseSettingTab extends PluginSettingTab {
     }
 }
 
-// --- Main Plugin Class ---
 module.exports = class SynapseVaultPlugin extends Plugin {
     async onload() {
         await this.loadSettings();
 
-        // Silently re-check recurring subscription status on boot
         if (this.settings.isPro && this.settings.licenseKey) {
             validateLemonLicense(this.settings.licenseKey, this.settings.instanceId).then(async (status) => {
                 if (!status.valid) {
@@ -289,12 +275,10 @@ module.exports = class SynapseVaultPlugin extends Plugin {
             });
         }
 
-        // Ribbon Icon (Left sidebar)
         this.addRibbonIcon('sparkles', 'Ask Synapse Vault AI', () => {
             new SynapseAskModal(this.app, this).open();
         });
 
-        // Command Palette
         this.addCommand({
             id: 'ask-synapse-vault',
             name: 'Ask Synapse Vault AI',
@@ -303,12 +287,7 @@ module.exports = class SynapseVaultPlugin extends Plugin {
             }
         });
 
-        // Register Settings Tab
         this.addSettingTab(new SynapseSettingTab(this.app, this));
-    }
-
-    onunload() {
-        // Cleanup if necessary
     }
 
     async loadSettings() {
