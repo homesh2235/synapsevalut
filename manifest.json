@@ -1,10 +1,10 @@
 ﻿{
-    "id": "synapse-vault",
+    "id": "synapse-vault-ai",
     "name": "Synapse Vault AI",
     "version": "1.0.0",
     "minAppVersion": "0.15.0",
-    "description": "Dynamic Island AI copilot for Obsidian with local multimodal RAG and instant Ghost-Typer form filling.",
+    "description": "Local RAG semantic search and AI agent for your notes powered by Gemini.",
     "author": "Homesh Mypudi",
-    "authorUrl": "https://github.com/homesh2235/synapse-vault",
+    "authorUrl": "https://github.com/homesh2235",
     "isDesktopOnly": true
 }
