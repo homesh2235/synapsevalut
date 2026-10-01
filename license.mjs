@@ -1,82 +1,56 @@
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import crypto from 'crypto';
-import { fileURLToPath } from 'url';
+// license.mjs (Gumroad Integration)
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const USAGE_FILE = path.join(__dirname, '.usage.json');
+/**
+ * Verifies customer license key via Gumroad API.
+ * @param {string} licenseKey - The key entered by the user in Obsidian settings.
+ * @param {string} productPermalink - The slug from your Gumroad product URL (e.g. "synapse-vault").
+ */
+export async function activateLicense(licenseKey, productPermalink = 'synapse-vault') {
+    if (!licenseKey || !licenseKey.trim()) {
+        return { valid: false, message: 'Please enter a valid license key.' };
+    }
 
-function getMachineFingerprint() {
-    const rawId = `${os.hostname()}-${os.platform()}-${os.arch()}-${os.cpus()[0]?.model || ''}`;
-    return crypto.createHash('sha256').update(rawId).digest('hex').slice(0, 16);
-}
-
-export async function activateLicense(licenseKey) {
     const cleanKey = licenseKey.trim();
-    const instanceName = `Synapse-${getMachineFingerprint()}`;
 
     try {
-        const response = await fetch('https://api.lemonsqueezy.com/v1/licenses/activate', {
+        const res = await fetch('https://api.gumroad.com/v2/licenses/verify', {
             method: 'POST',
             headers: {
-                'Accept': 'application/json',
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
             body: new URLSearchParams({
+                product_permalink: productPermalink,
                 license_key: cleanKey,
-                instance_name: instanceName
+                increment_uses_count: 'true'
             })
         });
 
-        const data = await response.json();
+        const data = await res.json();
 
-        if (data.activated && data.license_key?.status === 'active') {
-            const proRecord = {
-                isPro: true,
-                licenseKey: cleanKey,
-                instanceId: data.instance?.id,
-                activatedAt: Date.now(),
-                signature: crypto
-                    .createHash('sha256')
-                    .update(`${cleanKey}-${data.instance?.id}-${instanceName}`)
-                    .digest('hex')
+        if (data.success && !data.purchase?.refunded && !data.purchase?.chargebacked) {
+            return {
+                valid: true,
+                customerEmail: data.purchase?.email,
+                uses: data.uses,
+                message: 'License verified successfully!'
             };
-
-            fs.writeFileSync(USAGE_FILE, JSON.stringify(proRecord, null, 2));
-            return { success: true, message: 'Synapse Pro Activated!' };
         } else {
             return {
-                success: false,
-                message: data.error || 'Invalid or expired license key.'
+                valid: false,
+                message: data.message || 'Invalid, expired, or refunded license key.'
             };
         }
-    } catch (error) {
+    } catch (err) {
         return {
-            success: false,
-            message: 'Network error connecting to license server.'
+            valid: false,
+            message: `Network error verifying license: ${err.message}`
         };
     }
 }
 
-export function verifyProStatusLocally() {
-    if (process.env.SYNAPSE_DEV_MODE === 'true') return true;
-
-    try {
-        if (!fs.existsSync(USAGE_FILE)) return false;
-        const usage = JSON.parse(fs.readFileSync(USAGE_FILE, 'utf8'));
-
-        if (!usage.isPro || !usage.signature) return false;
-
-        const instanceName = `Synapse-${getMachineFingerprint()}`;
-        const expectedSig = crypto
-            .createHash('sha256')
-            .update(`${usage.licenseKey}-${usage.instanceId}-${instanceName}`)
-            .digest('hex');
-
-        return usage.signature === expectedSig;
-    } catch {
-        return false;
-    }
+/**
+ * Quick local check for cached license state on startup.
+ */
+export function isLicenseCached(settings) {
+    return Boolean(settings?.isPro && settings?.licenseKey);
 }

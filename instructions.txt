@@ -1,0 +1,11 @@
+Thank you for supporting Synapse Vault AI Pro!
+
+Your unique license key is displayed on your order confirmation page and in your purchase email.
+
+How to activate your Pro features:
+1. Open Obsidian.
+2. Go to Settings -> Synapse Vault AI.
+3. Paste your License Key into the license field.
+4. Click "Activate".
+
+Pro semantic search and Gemini agent capabilities will unlock instantly across your vault.
