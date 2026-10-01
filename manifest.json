@@ -1,7 +1,7 @@
 ﻿{
     "id": "synapse-vault",
     "name": "Synapse Vault AI",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "minAppVersion": "0.15.0",
     "description": "Local RAG semantic search and AI agent for your notes powered by Gemini.",
     "author": "Homesh Mypudi",
