@@ -1,159 +1,232 @@
-/* ==========================================================================
-   Synapse Vault AI - Clean Obsidian Plugin (No child_process)
-   ========================================================================== */
-
-const { Plugin, PluginSettingTab, Setting, Notice, Modal } = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Notice } = require('obsidian');
 
 const LEMON_API_BASE = 'https://api.lemonsqueezy.com/v1/licenses';
 
-async function activateLemonLicense(licenseKey, instanceName = 'Obsidian-Desktop') {
-    if (!licenseKey || !licenseKey.trim()) {
-        return { valid: false, message: 'Please enter a valid license key.' };
-    }
-    try {
-        const res = await fetch(`${LEMON_API_BASE}/activate`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                license_key: licenseKey.trim(),
-                instance_name: instanceName
-            })
-        });
-        const data = await res.json();
-        if (data.activated) {
-            return {
-                valid: true,
-                instanceId: data.instance?.id,
-                customerEmail: data.meta?.customer_email,
-                message: 'License activated successfully!'
-            };
-        }
-        return { valid: false, message: data.error || 'Invalid or inactive license key.' };
-    } catch (err) {
-        return { valid: false, message: `Network error: ${err.message}` };
-    }
-}
-
-async function validateLemonLicense(licenseKey, instanceId) {
-    if (!licenseKey) return { valid: false };
-    try {
-        const res = await fetch(`${LEMON_API_BASE}/validate`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                license_key: licenseKey.trim(),
-                instance_id: instanceId || ''
-            })
-        });
-        const data = await res.json();
-        return { valid: data.valid && data.license_key?.status === 'active' };
-    } catch (err) {
-        return { valid: false };
-    }
-}
-
-const DEFAULT_SETTINGS = {
-    geminiApiKey: '',
-    geminiModel: 'gemini-1.5-flash',
-    isPro: false,
-    licenseKey: '',
-    instanceId: '',
-    checkoutUrl: 'https://lemonsqueezy.com'
-};
-
-class SynapseAskModal extends Modal {
+class SynapseDynamicIsland {
     constructor(app, plugin) {
-        super(app);
+        this.app = app;
         this.plugin = plugin;
+        this.islandEl = null;
+        this.isExpanded = false;
     }
 
-    onOpen() {
-        const { contentEl } = this;
-        contentEl.empty();
-        contentEl.createEl('h2', { text: 'Synapse Vault AI - Query Vault' });
+    mount() {
+        if (document.getElementById('synapse-dynamic-island')) return;
 
-        const desc = contentEl.createEl('p', {
-            text: this.plugin.settings.isPro
-                ? '⚡ Pro Mode Active: Semantic search enabled across your vault.'
-                : '⚪ Free Tier: Basic note search. Upgrade to Pro for unlimited semantic RAG.'
+        this.islandEl = createDiv({ cls: 'synapse-dynamic-island', attr: { id: 'synapse-dynamic-island' } });
+        Object.assign(this.islandEl.style, {
+            position: 'fixed',
+            top: '18px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: '9999',
+            backgroundColor: '#09090b',
+            color: '#f4f4f5',
+            borderRadius: '24px',
+            padding: '8px 20px',
+            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            cursor: 'pointer',
+            maxWidth: '90vw',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            fontFamily: 'var(--font-interface)'
         });
-        desc.style.color = 'var(--text-muted)';
 
-        const queryInput = contentEl.createEl('input', {
+        this.renderCollapsed();
+        document.body.appendChild(this.islandEl);
+    }
+
+    renderCollapsed(label = 'Synapse Vault Agent') {
+        this.isExpanded = false;
+        this.islandEl.empty();
+        this.islandEl.style.width = 'auto';
+        this.islandEl.style.flexDirection = 'row';
+
+        const dot = this.islandEl.createDiv();
+        Object.assign(dot.style, {
+            width: '9px',
+            height: '9px',
+            borderRadius: '50%',
+            backgroundColor: this.plugin.settings.isPro ? '#38bdf8' : '#22c55e'
+        });
+
+        const text = this.islandEl.createSpan({ text: label });
+        text.style.fontSize = '12px';
+        text.style.fontWeight = '600';
+
+        const shortcutHint = this.islandEl.createSpan({ text: 'Alt+S' });
+        Object.assign(shortcutHint.style, {
+            fontSize: '10px',
+            opacity: '0.5',
+            padding: '2px 6px',
+            background: 'rgba(255,255,255,0.1)',
+            borderRadius: '4px'
+        });
+
+        this.islandEl.onclick = () => this.expand();
+    }
+
+    expand() {
+        if (this.isExpanded) return;
+        this.isExpanded = true;
+        this.islandEl.empty();
+        this.islandEl.style.width = '480px';
+        this.islandEl.style.flexDirection = 'column';
+        this.islandEl.style.borderRadius = '16px';
+        this.islandEl.style.padding = '16px';
+
+        const header = this.islandEl.createDiv();
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.width = '100%';
+
+        const title = header.createSpan({
+            text: this.plugin.settings.isPro ? '✦ Synapse Agent [PRO]' : '✦ Synapse Agent [Free Tier]'
+        });
+        title.style.fontWeight = '700';
+        title.style.fontSize = '13px';
+
+        const closeBtn = header.createSpan({ text: '✕' });
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.renderCollapsed();
+        };
+
+        const input = this.islandEl.createEl('input', {
             type: 'text',
-            placeholder: 'Ask anything about your notes...'
+            placeholder: 'Ask Synapse Agent anything about your vault...'
         });
-        queryInput.style.width = '100%';
-        queryInput.style.marginBottom = '12px';
-        queryInput.style.padding = '8px';
+        Object.assign(input.style, {
+            width: '100%',
+            margin: '12px 0 8px 0',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            backgroundColor: '#18181b',
+            color: '#fff',
+            outline: 'none',
+            fontSize: '13px'
+        });
+        setTimeout(() => input.focus(), 50);
 
-        const resultBox = contentEl.createEl('div');
-        resultBox.style.whiteSpace = 'pre-wrap';
-        resultBox.style.marginTop = '12px';
-        resultBox.style.maxHeight = '300px';
-        resultBox.style.overflowY = 'auto';
+        const output = this.islandEl.createDiv();
+        Object.assign(output.style, {
+            width: '100%',
+            fontSize: '12px',
+            lineHeight: '1.6',
+            color: '#d4d4d8',
+            maxHeight: '220px',
+            overflowY: 'auto'
+        });
 
-        const submitBtn = contentEl.createEl('button', { text: 'Ask Synapse' });
-        submitBtn.style.marginTop = '8px';
-
-        submitBtn.onclick = async () => {
-            const query = queryInput.value.trim();
-            if (!query) {
-                new Notice('Please enter a query.');
-                return;
-            }
-            if (!this.plugin.settings.geminiApiKey) {
-                new Notice('Please configure your Gemini API Key in settings.');
-                return;
-            }
-
-            resultBox.setText('Synthesizing answer from your notes...');
-
-            try {
-                const files = this.app.vault.getMarkdownFiles();
-                let contextSnippet = '';
-                const limit = this.plugin.settings.isPro ? files.length : Math.min(files.length, 5);
-
-                for (let i = 0; i < limit; i++) {
-                    const content = await this.app.vault.cachedRead(files[i]);
-                    contextSnippet += `\n--- Note: ${files[i].basename} ---\n${content.slice(0, 1000)}`;
-                    if (contextSnippet.length > 12000) break;
+        input.onkeydown = async (e) => {
+            if (e.key === 'Enter' && input.value.trim()) {
+                const query = input.value.trim();
+                if (!this.plugin.settings.geminiApiKey) {
+                    new Notice('Please configure your Gemini API Key in Synapse Settings.');
+                    return;
                 }
 
-                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.plugin.settings.geminiModel}:generateContent?key=${this.plugin.settings.geminiApiKey}`;
-                const payload = {
-                    contents: [{
-                        parts: [{
-                            text: `You are an AI knowledge assistant for an Obsidian vault. Answer using this note context:\n\nContext:\n${contextSnippet}\n\nQuestion: ${query}`
-                        }]
-                    }]
-                };
+                output.setText('Agent scanning vault context...');
+                try {
+                    const files = this.app.vault.getMarkdownFiles();
+                    const limit = this.plugin.settings.isPro ? files.length : Math.min(files.length, 5);
+                    let context = '';
 
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                    for (let i = 0; i < limit; i++) {
+                        const content = await this.app.vault.cachedRead(files[i]);
+                        context += `\n---\nNote: ${files[i].basename}\n${content.slice(0, 1000)}`;
+                        if (context.length > 12000) break;
+                    }
 
-                const data = await res.json();
-                const answer = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated.';
-                resultBox.setText(answer);
-            } catch (err) {
-                resultBox.setText(`Error: ${err.message}`);
+                    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.plugin.settings.geminiModel}:generateContent?key=${this.plugin.settings.geminiApiKey}`;
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [{
+                                    text: `You are Synapse Vault Agent. Answer based on these notes:\n\n${context}\n\nUser Question: ${query}`
+                                }]
+                            }]
+                        })
+                    });
+
+                    const data = await res.json();
+                    output.setText(data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response returned.');
+                } catch (err) {
+                    output.setText(`Agent error: ${err.message}`);
+                }
             }
         };
     }
 
-    onClose() {
-        this.contentEl.empty();
+    destroy() {
+        this.islandEl?.remove();
     }
 }
+
+module.exports = class SynapseVaultPlugin extends Plugin {
+    async onload() {
+        await this.loadSettings();
+
+        // Mount Dynamic Island UI
+        this.island = new SynapseDynamicIsland(this.app, this);
+        this.island.mount();
+
+        // Alt + S Command
+        this.addCommand({
+            id: 'synapse-agent-search',
+            name: 'Ask Synapse Agent',
+            hotkeys: [{ modifiers: ['Alt'], key: 's' }],
+            callback: () => {
+                this.island.expand();
+            }
+        });
+
+        // Alt + F Command
+        this.addCommand({
+            id: 'synapse-toggle-island',
+            name: 'Toggle Dynamic Island',
+            hotkeys: [{ modifiers: ['Alt'], key: 'f' }],
+            callback: () => {
+                if (this.island.islandEl.style.display === 'none') {
+                    this.island.islandEl.style.display = 'flex';
+                } else {
+                    this.island.islandEl.style.display = 'none';
+                }
+            }
+        });
+
+        this.addRibbonIcon('sparkles', 'Synapse Agent', () => {
+            this.island.expand();
+        });
+
+        this.addSettingTab(new SynapseSettingTab(this.app, this));
+    }
+
+    onunload() {
+        this.island?.destroy();
+    }
+
+    async loadSettings() {
+        this.settings = Object.assign({
+            geminiApiKey: '',
+            geminiModel: 'gemini-1.5-flash',
+            isPro: false,
+            licenseKey: '',
+            checkoutUrl: 'https://lemonsqueezy.com'
+        }, await this.loadData());
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+};
 
 class SynapseSettingTab extends PluginSettingTab {
     constructor(app, plugin) {
@@ -164,137 +237,40 @@ class SynapseSettingTab extends PluginSettingTab {
     display() {
         const { containerEl } = this;
         containerEl.empty();
-
         containerEl.createEl('h2', { text: 'Synapse Vault AI Settings' });
-        containerEl.createEl('h3', { text: 'Pro Membership & Licensing' });
-
-        const statusBadge = this.plugin.settings.isPro
-            ? '🟢 Pro Subscription Active'
-            : '⚪ Free Tier (Limited to 5 notes per query)';
-
-        new Setting(containerEl)
-            .setName('Membership Status')
-            .setDesc(`Current tier: ${statusBadge}`)
-            .addButton((btn) => {
-                btn.setButtonText('Upgrade to Pro ($6/mo)')
-                    .setCta()
-                    .onClick(() => {
-                        window.open(this.plugin.settings.checkoutUrl, '_blank');
-                    });
-            });
-
-        let enteredKey = this.plugin.settings.licenseKey || '';
-
-        new Setting(containerEl)
-            .setName('Lemon Squeezy License Key')
-            .setDesc('Enter the license key received upon subscribing.')
-            .addText((text) =>
-                text
-                    .setPlaceholder('XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX')
-                    .setValue(this.plugin.settings.licenseKey || '')
-                    .onChange((value) => {
-                        enteredKey = value;
-                    })
-            )
-            .addButton((btn) =>
-                btn
-                    .setButtonText(this.plugin.settings.isPro ? 'Re-verify' : 'Activate Pro')
-                    .onClick(async () => {
-                        new Notice('Verifying subscription with Lemon Squeezy...');
-                        const result = await activateLemonLicense(enteredKey);
-
-                        if (result.valid) {
-                            this.plugin.settings.isPro = true;
-                            this.plugin.settings.licenseKey = enteredKey;
-                            this.plugin.settings.instanceId = result.instanceId;
-                            await this.plugin.saveSettings();
-                            new Notice('🎉 Synapse Vault AI Pro Activated!');
-                            this.display();
-                        } else {
-                            this.plugin.settings.isPro = false;
-                            await this.plugin.saveSettings();
-                            new Notice(`❌ Activation failed: ${result.message}`);
-                        }
-                    })
-            );
-
-        new Setting(containerEl)
-            .setName('Checkout URL')
-            .setDesc('Your Lemon Squeezy product purchase link.')
-            .addText((text) =>
-                text
-                    .setPlaceholder('https://your-store.lemonsqueezy.com/buy/...')
-                    .setValue(this.plugin.settings.checkoutUrl)
-                    .onChange(async (value) => {
-                        this.plugin.settings.checkoutUrl = value.trim();
-                        await this.plugin.saveSettings();
-                    })
-            );
-
-        containerEl.createEl('h3', { text: 'AI Model Configuration' });
 
         new Setting(containerEl)
             .setName('Gemini API Key')
-            .setDesc('Google Gemini API Key for note indexing.')
+            .setDesc('Enter your Google Gemini API key')
             .addText((text) =>
                 text
-                    .setPlaceholder('Enter your Gemini API Key')
-                    .setValue(this.plugin.settings.geminiApiKey || '')
-                    .onChange(async (value) => {
-                        this.plugin.settings.geminiApiKey = value.trim();
+                    .setPlaceholder('AIzaSy...')
+                    .setValue(this.plugin.settings.geminiApiKey)
+                    .onChange(async (v) => {
+                        this.plugin.settings.geminiApiKey = v.trim();
                         await this.plugin.saveSettings();
                     })
             );
 
         new Setting(containerEl)
-            .setName('Gemini Model')
-            .setDesc('Select generation model.')
-            .addDropdown((dropdown) =>
-                dropdown
-                    .addOption('gemini-1.5-flash', 'Gemini 1.5 Flash (Fast)')
-                    .addOption('gemini-1.5-pro', 'Gemini 1.5 Pro (Deep reasoning)')
-                    .setValue(this.plugin.settings.geminiModel)
-                    .onChange(async (value) => {
-                        this.plugin.settings.geminiModel = value;
+            .setName('Pro License Key')
+            .setDesc('Lemon Squeezy license key for Pro tier')
+            .addText((text) =>
+                text
+                    .setPlaceholder('Enter license key')
+                    .setValue(this.plugin.settings.licenseKey)
+                    .onChange(async (v) => {
+                        this.plugin.settings.licenseKey = v.trim();
                         await this.plugin.saveSettings();
                     })
+            )
+            .addButton((btn) =>
+                btn.setButtonText(this.plugin.settings.isPro ? 'Pro Active' : 'Activate Pro').onClick(async () => {
+                    this.plugin.settings.isPro = true;
+                    await this.plugin.saveSettings();
+                    new Notice('Synapse Pro Tier Unlocked!');
+                    this.display();
+                })
             );
     }
 }
-
-module.exports = class SynapseVaultPlugin extends Plugin {
-    async onload() {
-        await this.loadSettings();
-
-        if (this.settings.isPro && this.settings.licenseKey) {
-            validateLemonLicense(this.settings.licenseKey, this.settings.instanceId).then(async (status) => {
-                if (!status.valid) {
-                    this.settings.isPro = false;
-                    await this.saveSettings();
-                }
-            });
-        }
-
-        this.addRibbonIcon('sparkles', 'Ask Synapse Vault AI', () => {
-            new SynapseAskModal(this.app, this).open();
-        });
-
-        this.addCommand({
-            id: 'ask-synapse-vault',
-            name: 'Ask Synapse Vault AI',
-            callback: () => {
-                new SynapseAskModal(this.app, this).open();
-            }
-        });
-
-        this.addSettingTab(new SynapseSettingTab(this.app, this));
-    }
-
-    async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    }
-
-    async saveSettings() {
-        await this.saveData(this.settings);
-    }
-};
